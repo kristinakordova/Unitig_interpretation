@@ -66,7 +66,11 @@ def check_presence(unitig_string, unitig_samples, unitig_string_fasta):
     df = df.reset_index(drop=True)
     return df
 
+<<<<<<< HEAD
 def extract_gene(matching_annotations, unitig_string = "CGGCAGCGTCAGATGTGTATAAGAGACAGTA"):
+=======
+def extract_gene(matching_annotations):
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
     import re
     import os
     import gffpandas.gffpandas as gffpd
@@ -103,6 +107,7 @@ def extract_gene(matching_annotations, unitig_string = "CGGCAGCGTCAGATGTGTATAAGA
         location_gene = unitig_location[
             (unitig_location["start"] <= location_on_contig) & (unitig_location["end"] >= location_on_contig)
         ]
+<<<<<<< HEAD
         if len(location_gene) == 0: print(f"Unitig outside gene in sample {sample_fna}")
         if len(location_gene) > 0:
             location_gene.index = ["unitig_index"]
@@ -112,6 +117,24 @@ def extract_gene(matching_annotations, unitig_string = "CGGCAGCGTCAGATGTGTATAAGA
         downstream = unitig_location[unitig_location["start"] < location_on_contig].head(3)
         upstream = unitig_location[unitig_location["start"] > location_on_contig].head(3)
         context = pd.concat([downstream,location_gene, upstream])
+=======
+
+        #extract genetic context
+        matching_indices = location_gene.index.tolist()
+        # Collect indices for context: 3 before and 3 after each match
+        context_indices = []
+        for idx in matching_indices:
+            start = max(0, idx - 3)
+            end = idx + 4 
+            context_indices.extend(range(start, end))
+        # Remove duplicates and keep only valid indices
+        context_indices = sorted(set(i for i in context_indices if i in unitig_location.index))
+        context = unitig_location.loc[context_indices]
+
+        #rename the unitig indexes
+        context = context.rename(index={5134: "unitig_index"})
+        location_gene = location_gene.rename(index={5134: "unitig_index"})
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
 
         #add to dictionary
         if len(context)>0:
@@ -120,6 +143,7 @@ def extract_gene(matching_annotations, unitig_string = "CGGCAGCGTCAGATGTGTATAAGA
     return contexts_across_samples, locations_across_samples
 
 
+<<<<<<< HEAD
 
 def extract_gene_seqeunces_unitig(alternative_proteins_locations):
     from tqdm import tqdm
@@ -236,6 +260,49 @@ def unitigs_seqneces_not_in_genes(unitig_string, matching_annotations, genes):
 
 
 
+=======
+def extract_gene_seqeunces(locations_across_samples, unitig_string):
+    '''Get the DNA and protein sequences for this unitig'''
+    from Bio import SeqIO
+    from Bio.Seq import Seq
+
+    genes = {}
+
+    for sample in locations_across_samples:
+        location = locations_across_samples[sample]
+
+        #read genome
+        genome_path = "/Users/kvk22/Library/CloudStorage/OneDrive-UniversityofCambridge/Desktop/genomes/"
+        fasta_path = genome_path + sample + ".fna"
+        for record in SeqIO.parse(fasta_path, "fasta"):
+            if record.id == location["seq_id"].values[0]:
+                seqeunce = record.seq
+                break
+
+        #confirm contig is in sequence otherwise reverse complement
+        if unitig_string.lower() in str(seqeunce):
+            seqeunce = str(seqeunce)
+        else:
+            seqeunce_reversed = str(seqeunce.reverse_complement())
+            #id thill cnnot locate raise error
+            if unitig_string.lower() not in seqeunce_reversed:
+                raise ValueError("unitig_string is not present in the sequence")
+        
+        #get gene string 
+        start_value = int(location["start"].values[0])-1
+        end_value = int(location["end"].values[0])
+        gene_string = str(seqeunce[start_value:end_value])
+
+        #translate to protein
+        protein_seq = str(Seq(gene_string).translate())
+        if protein_seq[0] != "M":
+            raise ValueError(f"Something wrong with translation. Protein sequence: {protein_seq}")
+
+        #add to dictionary
+        genes[sample] = [gene_string, protein_seq]
+        
+    return genes
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
 
 def clustal_alignment(extracted_genes_proteins):
     import os
@@ -255,14 +322,24 @@ def clustal_alignment(extracted_genes_proteins):
             fasta_file.write(f">{key}\n{extracted_genes_proteins[key][0]}\n")
 
     #Run Clustal Omega to generate the alignment (output in FASTA format)
+<<<<<<< HEAD
     msa_output_path_gen = os.path.join(temp_dir, "msa_output_gen.fasta")
     subprocess.run([
         "clustalo", "-i", fasta_path, "-o", msa_output_path_gen, "--force", "--outfmt=fasta"
+=======
+    msa_output_path = os.path.join(temp_dir, "msa_output.fasta")
+    subprocess.run([
+        "clustalo", "-i", fasta_path, "-o", msa_output_path, "--force", "--outfmt=fasta"
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
     ], check=True)
 
     #Read the aligned sequences from the output FASTA
     aligned_seqs = {}
+<<<<<<< HEAD
     for record in SeqIO.parse(msa_output_path_gen, "fasta"):
+=======
+    for record in SeqIO.parse(msa_output_path, "fasta"):
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
         aligned_seqs[record.id] = str(record.seq)
 
     #Convert the alignment to a pandas DataFrame
@@ -271,6 +348,13 @@ def clustal_alignment(extracted_genes_proteins):
         index=list(aligned_seqs.keys())
     ).T  # Transpose for SNP analysis
 
+<<<<<<< HEAD
+=======
+    #Clean up: delete the temporary directory and files
+    shutil.rmtree(temp_dir)
+
+
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
     #align proteins
     temp_dir = tempfile.mkdtemp()
     #Write each sequence to a FASTA file in the temp directory
@@ -280,14 +364,24 @@ def clustal_alignment(extracted_genes_proteins):
             fasta_file.write(f">{key}\n{extracted_genes_proteins[key][1]}\n")
 
     #Run Clustal Omega to generate the alignment (output in FASTA format)
+<<<<<<< HEAD
     msa_output_path_prot = os.path.join(temp_dir, "msa_output_prot.fasta")
     subprocess.run([
         "clustalo", "-i", fasta_path, "-o", msa_output_path_prot, "--force", "--outfmt=fasta"
+=======
+    msa_output_path = os.path.join(temp_dir, "msa_output.fasta")
+    subprocess.run([
+        "clustalo", "-i", fasta_path, "-o", msa_output_path, "--force", "--outfmt=fasta"
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
     ], check=True)
 
     #Read the aligned sequences from the output FASTA
     aligned_seqs = {}
+<<<<<<< HEAD
     for record in SeqIO.parse(msa_output_path_prot, "fasta"):
+=======
+    for record in SeqIO.parse(msa_output_path, "fasta"):
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
         aligned_seqs[record.id] = str(record.seq)
 
     #Convert the alignment to a pandas DataFrame
@@ -296,6 +390,7 @@ def clustal_alignment(extracted_genes_proteins):
         index=list(aligned_seqs.keys())
     ).T  # Transpose for SNP analysis
     #Clean up: delete the temporary directory and files
+<<<<<<< HEAD
 
 
     return alignment_genes, alignmed_proteins, msa_output_path_gen, msa_output_path_prot
@@ -516,3 +611,9 @@ def run_ncbi_annotations(genes, number_of_hits_to_run = 10):
         df_hits = pd.DataFrame(hits)
         all_hits = pd.concat([all_hits, df_hits], ignore_index=True)
     return all_hits
+=======
+    shutil.rmtree(temp_dir)
+
+
+    return alignment_genes, alignmed_proteins
+>>>>>>> 15d7af32ab701fe8e54d73b9f5dcf17bac926480
